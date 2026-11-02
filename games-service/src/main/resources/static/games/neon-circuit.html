@@ -1,0 +1,130 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Neon Circuit</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+<div class="tc l"><div class="tb" data-act="left">&#9664;</div><div class="tb" data-act="right">&#9654;</div></div><div class="tc r"><div class="tb" data-act="act">DRIFT</div><div class="tb" data-act="down">BRK</div><div class="tb" data-act="up">GAS</div></div>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var N = 260, HALF = 62, pts = null, car, trail, idx, prog, lapsDone, lapStart, bestLap, bonus, timeLeft, tt, msg, msgT, lastLap;
+
+  function build() {
+    pts = [];
+    for (var i = 0; i < N; i++) {
+      var th = i / N * 6.28318, r = 1 + 0.16 * Math.sin(2 * th + 0.6) + 0.1 * Math.sin(3 * th + 1.2);
+      pts.push({ x: Math.cos(th) * r * 820, y: Math.sin(th) * r * 520 });
+    }
+  }
+  function wrap(i) { return ((i % N) + N) % N; }
+  function nearest(x, y, around, win) {
+    var best = 1e18, bi = around, i, j, d;
+    var from = win ? -win : 0, to = win ? win : N - 1;
+    for (j = from; j <= to; j++) {
+      i = wrap((win ? around : 0) + j);
+      d = (pts[i].x - x) * (pts[i].x - x) + (pts[i].y - y) * (pts[i].y - y);
+      if (d < best) { best = d; bi = i; }
+    }
+    return { i: bi, d: Math.sqrt(best) };
+  }
+  function say(t) { msg = t; msgT = 2; }
+
+  function reset() {
+    if (!pts) build();
+    var s = wrap(-6), p = pts[s], q = pts[wrap(s + 1)];
+    car = { x: p.x, y: p.y, a: Math.atan2(q.y - p.y, q.x - p.x), vf: 0, vl: 0 };
+    trail = []; idx = s; prog = 0; lapsDone = 0; lapStart = 0; bestLap = 0; bonus = 0; timeLeft = 120; tt = 0; msg = ''; msgT = 0; lastLap = 0;
+  }
+
+  function update(dt) {
+    var k = GK.keys, i;
+    var near = nearest(car.x, car.y, idx, 14);
+    var on = near.d < HALF;
+    var delta = near.i - idx; if (delta > N / 2) delta -= N; if (delta < -N / 2) delta += N;
+    idx = near.i; prog += delta;
+
+    var cap = on ? 400 : 150;
+    if (k.up) car.vf += (on ? 340 : 160) * dt;
+    if (k.down) car.vf -= 520 * dt;
+    car.vf = Math.max(-120, car.vf);
+    car.vf -= car.vf * 0.45 * dt;
+    if (!on) car.vf -= car.vf * 2.2 * dt;
+    if (car.vf > cap) car.vf -= (car.vf - cap) * Math.min(1, 4 * dt);
+
+    var grip = k.act ? 1.8 : (on ? 7 : 4);
+    car.vl *= Math.exp(-grip * dt);
+    var steer = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+    var turn = steer * 2.7 * GK.clamp(Math.abs(car.vf) / 140, 0, 1) * (car.vf >= 0 ? 1 : -1) * (k.act ? 1.25 : 1);
+    var oldA = car.a; car.a += turn * dt;
+    // the sideways velocity carried by the old heading becomes slide (drift)
+    var dA = car.a - oldA; car.vl -= car.vf * Math.sin(dA) * 0.9;
+
+    var fx = Math.cos(car.a), fy = Math.sin(car.a);
+    var vx = fx * car.vf - fy * car.vl, vy = fy * car.vf + fx * car.vl;
+    car.x += vx * dt; car.y += vy * dt;
+
+    if (Math.abs(car.vl) > 55 && Math.random() < 0.9) trail.push({ x: car.x - fx * 12, y: car.y - fy * 12, t: 3 });
+    for (i = trail.length - 1; i >= 0; i--) { trail[i].t -= dt; if (trail[i].t <= 0) trail.splice(i, 1); }
+
+    tt += dt; timeLeft -= dt;
+    while (prog >= (lapsDone + 1) * N) {
+      var lapTime = tt - lapStart; lapStart = tt; lapsDone++; lastLap = lapTime;
+      if (!bestLap || lapTime < bestLap) bestLap = lapTime;
+      var b = Math.max(0, Math.round((60 - lapTime) * 15)); bonus += b;
+      say('Lap ' + lapsDone + '  ' + lapTime.toFixed(1) + 's' + (b ? '  +' + b : ''));
+    }
+    GK.score = Math.max(0, prog) / N * 1000 + bonus;
+    msgT = Math.max(0, msgT - dt);
+    if (timeLeft <= 0) { timeLeft = 0; GK.gameOver('Time!'); }
+  }
+
+  function draw(ctx, w, h) {
+    var i;
+    ctx.fillStyle = '#0d3f70'; ctx.fillRect(0, 0, w, h);
+    ctx.save(); ctx.translate(w / 2 - car.x, h / 2 - car.y);
+    ctx.strokeStyle = 'rgba(255,215,0,.07)'; ctx.lineWidth = 1;
+    var gx = Math.floor((car.x - w / 2) / 200) * 200, gyy = Math.floor((car.y - h / 2) / 200) * 200;
+    for (var x = gx; x < car.x + w / 2 + 200; x += 200) { ctx.beginPath(); ctx.moveTo(x, car.y - h / 2); ctx.lineTo(x, car.y + h / 2); ctx.stroke(); }
+    for (var y = gyy; y < car.y + h / 2 + 200; y += 200) { ctx.beginPath(); ctx.moveTo(car.x - w / 2, y); ctx.lineTo(car.x + w / 2, y); ctx.stroke(); }
+
+    function path() { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var j = 1; j < N; j++) ctx.lineTo(pts[j].x, pts[j].y); ctx.closePath(); }
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    path(); ctx.strokeStyle = '#ffd700'; ctx.lineWidth = HALF * 2 + 16; ctx.globalAlpha = 0.9; ctx.stroke(); ctx.globalAlpha = 1;
+    path(); ctx.strokeStyle = '#27425f'; ctx.lineWidth = HALF * 2; ctx.stroke();
+    path(); ctx.strokeStyle = '#5b7ea3'; ctx.lineWidth = 3; ctx.setLineDash([18, 22]); ctx.stroke(); ctx.setLineDash([]);
+
+    var p0 = pts[0], p1 = pts[1], ang = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+    ctx.save(); ctx.translate(p0.x, p0.y); ctx.rotate(ang);
+    for (i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#10325c'; ctx.fillRect(-6, -HALF + i * HALF / 4, 6, HALF / 4); ctx.fillStyle = i % 2 ? '#10325c' : '#fff'; ctx.fillRect(0, -HALF + i * HALF / 4, 6, HALF / 4); }
+    ctx.restore();
+
+    for (i = 0; i < trail.length; i++) { ctx.globalAlpha = Math.min(0.5, trail[i].t / 3 * 0.5); ctx.fillStyle = '#10325c'; ctx.fillRect(trail[i].x - 3, trail[i].y - 3, 6, 6); }
+    ctx.globalAlpha = 1;
+
+    ctx.save(); ctx.translate(car.x, car.y); ctx.rotate(car.a);
+    ctx.fillStyle = '#10325c'; ctx.fillRect(-14, -13, 9, 5); ctx.fillRect(-14, 8, 9, 5); ctx.fillRect(7, -13, 9, 5); ctx.fillRect(7, 8, 9, 5);
+    GK.rr(ctx, -20, -10, 40, 20, 7); ctx.fillStyle = '#ffd700'; ctx.fill();
+    ctx.fillStyle = '#0b1530'; GK.rr(ctx, -2, -8, 13, 16, 3); ctx.fill();
+    ctx.fillStyle = '#b8860b'; ctx.fillRect(-18, -2, 12, 4);
+    ctx.fillStyle = '#fff7b0'; ctx.fillRect(17, -9, 3, 5); ctx.fillRect(17, 4, 3, 5);
+    ctx.restore();
+    ctx.restore();
+
+    var s = 0.085, mx = 16, my = h - 120;                    // minimap
+    ctx.fillStyle = 'rgba(10,55,100,.75)'; ctx.fillRect(mx - 6, my - 6, 160, 110);
+    ctx.save(); ctx.translate(mx + 76, my + 49); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (i = 1; i < N; i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath();
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 22; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(car.x, car.y, 40, 0, 6.2832); ctx.fill();
+    ctx.restore();
+    if (msgT > 0) { ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = '#ffd700'; ctx.font = 'bold 26px Georgia'; ctx.textAlign = 'center'; ctx.fillText(msg, w / 2, h * 0.2); ctx.globalAlpha = 1; }
+  }
+
+  function hud() {
+    var m = Math.floor(timeLeft / 60), s = Math.floor(timeLeft % 60);
+    return 'Lap ' + (lapsDone + 1) + '  Time ' + m + ':' + (s < 10 ? '0' : '') + s + (bestLap ? '  Best lap ' + bestLap.toFixed(1) + 's' : '');
+  }
+
+  GK.start({ id: 'neon-circuit', title: 'Neon Circuit', tip: '120 seconds: lap the circuit as many times as you can. Arrows/WASD drive, hold Space for a handbrake drift. Grass slows you down.',
+             reset: reset, update: update, draw: draw, hud: hud });
+})();
+</script>
+</body></html>

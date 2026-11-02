@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Entertainment Games</title>
+<style>
+body{margin:0;min-height:100vh;background:linear-gradient(180deg,#0b3a68,#2d7cc4);color:#fff;font-family:Georgia,'Segoe UI',serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px}
+h1{color:#ffd700;text-align:center;text-shadow:1px 1px 0 #b8860b,2px 2px 0 #8a6508,3px 4px 8px rgba(10,47,85,.7)}
+h2{color:#ffe27a;margin-top:26px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+a.card{display:block;background:rgba(255,255,255,.12);border:2px solid #ffd700;border-radius:14px;padding:12px 14px;color:#fff;text-decoration:none}
+a.card:hover{background:rgba(255,215,0,.22)}
+.ic{font-size:34px}.t{font-weight:bold;color:#ffd700}.b{font-size:.85rem;color:#e6f2ff}.c{font-size:.75rem;color:#bcd9f5}
+</style></head>
+<body><main>
+<h1>Entertainment Games</h1>
+<p style="text-align:center">Games microservice - also available from the "Entertainment Games" drop-down of the PDF Voice app.</p>
+<div id="list">Loading...</div>
+</main>
+<script>
+fetch('/api/games').then(function(r){return r.json();}).then(function(list){
+  var groups={},box=document.getElementById('list');box.textContent='';
+  list.forEach(function(g){(groups[g.group]=groups[g.group]||[]).push(g);});
+  Object.keys(groups).forEach(function(k){
+    var h=document.createElement('h2');h.textContent=k;box.appendChild(h);
+    var grid=document.createElement('div');grid.className='grid';box.appendChild(grid);
+    groups[k].forEach(function(g){
+      var a=document.createElement('a');a.className='card';a.href='games/'+g.file;
+      [['ic',g.icon],['t',g.name],['b',g.blurb],['c',g.controls]].forEach(function(p){var d=document.createElement('div');d.className=p[0];d.textContent=p[1];a.appendChild(d);});
+      grid.appendChild(a);
+    });
+  });
+}).catch(function(){document.getElementById('list').textContent='Could not load the game list.';});
+</script></body></html>

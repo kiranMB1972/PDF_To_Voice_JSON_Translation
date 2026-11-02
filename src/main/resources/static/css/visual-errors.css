@@ -1,0 +1,29 @@
+/* Coloured, animated error / notice card (shared by every screen). Colours come from --c1/--c2 set per category. */
+.notice.vx { --c1:#2193b0; --c2:#6dd5ed; position:relative; overflow:hidden; border:0; border-radius:20px; padding:18px 20px; display:flex; gap:18px; align-items:flex-start;
+  background: linear-gradient(135deg, var(--c1), var(--c2) 140%), #14082b; background-blend-mode: normal; color:#fff;
+  box-shadow: 0 14px 40px rgba(8,14,40,.45), inset 0 0 0 1px rgba(255,255,255,.35); animation: vxIn .55s cubic-bezier(.2,1.4,.4,1) both; }
+.notice.vx::before { content:""; position:absolute; inset:0; background: radial-gradient(circle at 12% 0%, rgba(255,255,255,.28), transparent 45%), rgba(10,6,28,.42); pointer-events:none; }
+.notice.vx > * { position:relative; }
+.vx-ico { font-size:3.4rem; line-height:1; animation: vxBounce 1.7s ease-in-out infinite; filter: drop-shadow(0 6px 10px rgba(8,14,40,.45)); }
+.vx-body { min-width:0; flex:1; }
+.vx-body h3 { margin:0 0 4px; font-size:1.25rem; text-shadow:0 2px 6px rgba(8,14,40,.4); }
+.vx-body h4 { margin:12px 0 6px; font-size:.82rem; letter-spacing:1.4px; text-transform:uppercase; color:#e6efff; }
+.vx-why { margin:2px 0 8px; color:#f3f7ff; line-height:1.45; }
+.vx-msg { margin:8px 0; padding:9px 12px; border-radius:12px; background:rgba(8,14,40,.28); border-left:5px solid #ffd166; font-family:Consolas,monospace; font-size:.9rem; word-break:break-word; animation: vxFade .5s .15s both; }
+.vx-msg span { display:block; font:700 .66rem "Segoe UI",sans-serif; text-transform:uppercase; letter-spacing:1.3px; color:#ffe9ad; margin-bottom:2px; }
+.vx-hint { margin:6px 0; color:#fff3c4; }
+.vx-ctx { margin:6px 0; font-size:.8rem; color:#dbe8ff; opacity:.95; }
+.vx-steps { list-style:none; margin:0; padding:0; display:grid; gap:6px; counter-reset: s; }
+.vx-steps li { counter-increment: s; display:flex; gap:10px; align-items:center; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.16); animation: vxSlide .5s calc(.2s + var(--i,1) * .12s) both; }
+.vx-steps li::before { content: counter(s); flex:0 0 26px; height:26px; border-radius:50%; display:grid; place-items:center; font-weight:800; background:#fff; color:var(--c1); box-shadow:0 0 0 3px rgba(255,255,255,.3); }
+.vx-tip { margin:12px 0 4px; padding:11px 14px; border-radius:14px; border:1px dashed #ffe08a; background:linear-gradient(120deg, rgba(255,224,138,.28), rgba(255,255,255,.08)); animation: vxFade .6s .7s both; }
+.vx-tip b { display:block; color:#ffe9ad; margin-bottom:2px; }
+.vx-foot { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; font-size:.74rem; color:#dbe8ff; }
+.vx-close { padding:5px 12px; font-size:.76rem; background:rgba(255,255,255,.9); color:#1a1033; }
+.notice.vx.info { box-shadow: 0 14px 40px rgba(8,14,40,.4), inset 0 0 0 1px rgba(255,255,255,.35); }
+@keyframes vxIn { from { transform: translateY(18px) scale(.94); opacity:0; } }
+@keyframes vxBounce { 50% { transform: translateY(-7px) rotate(-6deg); } }
+@keyframes vxSlide { from { transform: translateX(-20px); opacity:0; } }
+@keyframes vxFade { from { opacity:0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .notice.vx, .notice.vx * { animation-duration:.01ms !important; animation-iteration-count:1 !important; } }
+@media (max-width: 640px) { .notice.vx { flex-direction:column; } .vx-ico { font-size:2.6rem; } }

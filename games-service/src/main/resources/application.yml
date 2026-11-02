@@ -1,0 +1,14 @@
+server:
+  port: ${GAMES_PORT:8095}
+  shutdown: graceful
+
+spring:
+  application:
+    name: games-service
+  threads:
+    virtual:
+      enabled: true
+
+games:
+  # Pages allowed to call this service from the browser (the main PDF Voice And Games app).
+  allowed-origins: ${GAMES_ALLOWED_ORIGINS:http://localhost:8089,http://127.0.0.1:8089}

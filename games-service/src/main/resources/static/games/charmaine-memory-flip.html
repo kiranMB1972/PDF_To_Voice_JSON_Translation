@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Charmaine Memory Flip</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var EM = ['\uD83D\uDD25', '\uD83D\uDC51', '\uD83D\uDC8E', '\u2B50', '\uD83C\uDF1F', '\uD83D\uDC96', '\uD83E\uDD8B', '\uD83C\uDF40'];
+  var cards, open, moves, matched, lock, back, layout = { x: 0, y: 0, cw: 80, gap: 12 };
+
+  function reset() {
+    var deck = EM.concat(EM);
+    for (var i = deck.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = deck[i]; deck[i] = deck[j]; deck[j] = t; }
+    cards = deck.map(function (e) { return { e: e, flip: 0, target: 0, done: false }; });
+    open = []; moves = 0; matched = 0; lock = 0; back = null;
+  }
+
+  function place(w, h) {
+    var cw = Math.floor(Math.min((w - 40 - 3 * 12) / 4, (h - 120 - 3 * 12) / 4, 120));
+    layout.cw = cw; layout.x = Math.floor((w - (4 * cw + 3 * layout.gap)) / 2); layout.y = 56;
+  }
+  function slot(i) { var c = i % 4, r = Math.floor(i / 4); return { x: layout.x + c * (layout.cw + layout.gap), y: layout.y + r * (layout.cw + layout.gap) }; }
+
+  function pick(i) {
+    var c = cards[i];
+    if (lock > 0 || c.done || c.target === 1 || open.length >= 2) return;
+    c.target = 1; open.push(i);
+    if (open.length === 2) {
+      moves++;
+      var a = cards[open[0]], b = cards[open[1]];
+      if (a.e === b.e) { a.done = b.done = true; matched++; open = []; GK.score = matched * 50;
+        if (matched === EM.length) { GK.score = Math.max(100, 1000 - moves * 25 - Math.floor(GK.time) * 3); GK.gameOver('You found every pair!'); } }
+      else { lock = 0.9; }
+    }
+  }
+
+  function update(dt) {
+    place(GK.w, GK.h);
+    var t; while ((t = GK.takeTap())) {
+      for (var i = 0; i < cards.length; i++) { var s = slot(i); if (t.x >= s.x && t.x <= s.x + layout.cw && t.y >= s.y && t.y <= s.y + layout.cw) { pick(i); break; } }
+    }
+    if (lock > 0) { lock -= dt; if (lock <= 0) { open.forEach(function (i) { cards[i].target = 0; }); open = []; } }
+    cards.forEach(function (c) { c.flip += (c.target - c.flip) * Math.min(1, 12 * dt); });
+  }
+
+  function draw(ctx, w, h) {
+    place(w, h);
+    var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#0f4c85'); g.addColorStop(1, '#2d7cc4'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    cards.forEach(function (c, i) {
+      var s = slot(i), cw = layout.cw, sx = Math.abs(Math.cos(Math.PI * c.flip)), face = c.flip > 0.5;
+      ctx.save(); ctx.translate(s.x + cw / 2, s.y + cw / 2); ctx.scale(Math.max(0.05, sx), 1);
+      GK.rr(ctx, -cw / 2, -cw / 2, cw, cw, 12);
+      var gr = ctx.createLinearGradient(0, -cw / 2, 0, cw / 2);
+      if (face) { gr.addColorStop(0, '#fff6c8'); gr.addColorStop(1, c.done ? '#b6f0c0' : '#ffe27a'); } else { gr.addColorStop(0, '#ffe45c'); gr.addColorStop(1, '#d9a800'); }
+      ctx.fillStyle = gr; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.font = Math.floor(cw * 0.5) + 'px ' + GK.EMOJI; ctx.fillStyle = '#5a3a00';
+      ctx.fillText(face ? c.e : '?', 0, 2);
+      ctx.restore();
+    });
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+
+  GK.start({ id: 'charmaine-memory-flip', title: 'Charmaine Memory Flip', tip: 'Tap two cards to flip them. Find all 8 pairs in as few moves as you can.',
+             reset: reset, update: update, draw: draw, hud: function () { return 'Moves ' + moves + '  Pairs ' + matched + '/8'; } });
+  GK.test = { deck: function () { return cards.map(function (c) { return c.e; }); }, slot: function (i) { place(GK.w, GK.h); var s = slot(i); return { x: s.x + layout.cw / 2, y: s.y + layout.cw / 2 }; },
+              tap: function (x, y) { GK.taps.push({ x: x, y: y }); } };
+})();
+</script>
+</body></html>

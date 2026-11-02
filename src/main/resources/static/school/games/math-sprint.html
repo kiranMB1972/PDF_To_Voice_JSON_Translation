@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Math Sprint - School games</title>
+    <link rel="stylesheet" href="../../css/gold.css"/>
+    <link rel="stylesheet" href="../../css/visual-errors.css"/>
+    <link rel="stylesheet" href="../school.css"/>
+    <link rel="stylesheet" href="games.css"/>
+</head>
+<body class="pop game">
+<div class="pop-bar"><h1 class="gold3d"><span id="gtitle">Math Sprint</span> <small id="glevel"></small></h1></div>
+<main class="pop-main"><div class="gm">
+    <div id="notice" class="notice" hidden></div>
+    <div class="hud3"><div><span>Score</span><b id="score">0</b></div><div><span id="l2">Seconds</span><b id="t2">60</b></div><div><span>Best</span><b id="best">-</b></div></div>
+    <div class="stage" id="stage"></div>
+    <div class="card board" id="board"></div>
+</div></main>
+<script src="../../js/visual-errors.js"></script>
+<script src="../school-common.js"></script>
+<script src="edu-games.js"></script>
+<script src="game-common.js"></script>
+<script>
+var K = GameKit, el = K.el, G = EduGames, $ = function (i) { return document.getElementById(i); }, stage = $('stage');
+function clr(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function setScore(v) { $('score').textContent = v; }
+function over(score, msg) {
+  clr(stage); stage.appendChild(el('div', { class: 'bigq', text: msg })); stage.appendChild(el('p', { text: 'You scored ' + score + ' points' }));
+  K.finish(score).then(function (best) { $('best').textContent = best; }); K.confetti(innerWidth / 2, innerHeight / 3, 90);
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '↻ Play again', onclick: function () { go(); } }));
+}
+
+var ctx, score, streak, left, q, tm, live;
+function ask() {
+  q = G.mathQuestion(ctx.level); clr(stage);
+  stage.appendChild(el('div', { class: 'combo', id: 'combo', text: streak > 1 ? '🔥 ' + streak + ' in a row!' : '' }));
+  stage.appendChild(el('div', { class: 'bigq', text: q.display }));
+  var box = el('div', { class: 'choices' });
+  q.choices.forEach(function (c, i) {
+    box.appendChild(el('button', { type: 'button', text: String(c), 'data-k': String(i + 1), onclick: function (e) { pick(c, e.target); } }));
+  });
+  stage.appendChild(box);
+}
+function pick(c, btn) {
+  if (!live) return;
+  if (c === q.answer) { streak++; score += G.mathPoints(streak); setScore(score); btn.classList.add('good'); K.burstAt(btn); setTimeout(ask, 220); }
+  else { streak = 0; score = Math.max(0, score - 5); setScore(score); btn.classList.add('bad'); setTimeout(ask, 380); }
+}
+function go() {
+  score = 0; streak = 0; left = 60; live = true; setScore(0); $('t2').textContent = left;
+  ask(); clearInterval(tm);
+  tm = setInterval(function () { left--; $('t2').textContent = left; if (left <= 0) { clearInterval(tm); live = false; over(score, left <= 0 ? "Time's up!" : ''); } }, 1000);
+}
+document.addEventListener('keydown', function (e) { var b = stage.querySelector('[data-k="' + e.key + '"]'); if (b) b.click(); });
+K.boot('math-sprint', 'Math Sprint').then(function (c) {
+  ctx = c; clr(stage); stage.appendChild(el('div', { class: 'bigq', text: '60 seconds. Quick sums!' }));
+  stage.appendChild(el('p', { text: 'Correct answers in a row give bonus points. Keys 1-4 also work.' }));
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '▶ Start', onclick: go }));
+});
+</script>
+</body>
+</html>

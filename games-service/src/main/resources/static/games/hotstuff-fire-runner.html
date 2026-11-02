@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Hotstuff Fire Runner</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+<div class="tc r"><div class="tb" data-act="up">JUMP</div></div>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var P, obs, gems, dist, speed, nextX, gemN, held, stars;
+  function gyy() { return GK.h * 0.78; }
+  function reset() {
+    P = { y: 0, vy: 0, x: 0 }; obs = []; gems = []; dist = 0; speed = 300; nextX = 800; gemN = 0; held = false;
+    stars = []; for (var i = 0; i < 40; i++) stars.push({ x: Math.random(), y: Math.random() * 0.6, r: Math.random() * 2 + 0.5 });
+  }
+  function spawn() {
+    while (nextX < dist + GK.w + 400) {
+      var tall = Math.random() < 0.35, h = tall ? 62 : 40;
+      obs.push({ x: nextX, w: tall ? 40 : 46, h: h });
+      if (Math.random() < 0.7) for (var i = 0; i < 3; i++) gems.push({ x: nextX + (i - 1) * 40, y: 90 + (tall ? 60 : 30) + 20 * Math.sin(i * 1.6) });
+      nextX += speed * GK.rand(0.95, 1.4) + 120;
+    }
+  }
+  function update(dt) {
+    var k = GK.keys, want = !!(k.up || k.act || k.right);
+    speed = 300 + Math.min(380, dist / 60);
+    var onGround = P.y <= 0.001;
+    if (want && onGround && !held) { P.vy = 640; held = true; }
+    if (!want) held = false;
+    var g = (P.vy > 0 && want) ? 1100 : 1900; if (!onGround && k.down) g *= 1.7;
+    P.vy -= g * dt; P.y += P.vy * dt; if (P.y < 0) { P.y = 0; P.vy = 0; }
+    dist += speed * dt; spawn();
+    GK.score = dist / 14 + gemN * 20;
+    var px = dist + GK.w * 0.2, i;
+    for (i = obs.length - 1; i >= 0; i--) {
+      var o = obs[i]; if (o.x + o.w < dist - 100) { obs.splice(i, 1); continue; }
+      if (px + 16 > o.x + 4 && px - 16 < o.x + o.w - 4 && P.y < o.h - 8) { GK.gameOver('Splash! Cooled down.'); return; }
+    }
+    for (i = gems.length - 1; i >= 0; i--) {
+      if (gems[i].x < dist - 100) { gems.splice(i, 1); continue; }
+      if (Math.abs(gems[i].x - px) < 26 && Math.abs(gems[i].y - (P.y + 22)) < 34) { gemN++; gems.splice(i, 1); }
+    }
+  }
+  function draw(ctx, w, h) {
+    var gyv = gyy(), i;
+    var sky = ctx.createLinearGradient(0, 0, 0, gyv); sky.addColorStop(0, '#0b3a68'); sky.addColorStop(0.75, '#2d7cc4'); sky.addColorStop(1, '#8cc4f0');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; stars.forEach(function (s) { ctx.beginPath(); ctx.arc(((s.x * w - dist * 0.05) % w + w) % w, s.y * gyv, s.r, 0, 6.2832); ctx.fill(); });
+    ctx.fillStyle = '#1a5a99'; ctx.beginPath(); ctx.moveTo(0, gyv);
+    for (var x = 0; x <= w; x += 12) ctx.lineTo(x, gyv - 50 - 36 * Math.sin((x + dist * 0.1) * 0.011) - 18 * Math.sin((x + dist * 0.1) * 0.03)); ctx.lineTo(w, gyv); ctx.fill();
+    ctx.fillStyle = '#2b6aa8'; ctx.fillRect(0, gyv, w, h - gyv); ctx.fillStyle = '#ffd700'; ctx.fillRect(0, gyv, w, 4);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    obs.forEach(function (o) { var ox = o.x - dist; GK.rr(ctx, ox, gyv - o.h, o.w, o.h, 8); var gr = ctx.createLinearGradient(0, gyv - o.h, 0, gyv); gr.addColorStop(0, '#eaf8ff'); gr.addColorStop(1, '#8fd0f5'); ctx.fillStyle = gr; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); });
+    ctx.font = '24px ' + GK.EMOJI; gems.forEach(function (g) { ctx.fillText('\uD83D\uDC8E', g.x - dist, gyv - g.y); });
+    ctx.font = '44px ' + GK.EMOJI; ctx.fillText('\uD83D\uDD25', GK.w * 0.2, gyv - P.y - 24 + Math.sin(GK.time * 12) * 2);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  GK.start({ id: 'hotstuff-fire-runner', title: 'Hotstuff Fire Runner', tip: 'Space / Up / tap to jump over the ice blocks (hold for a higher jump). Collect the diamonds!',
+             reset: reset, update: update, draw: draw, hud: function () { return 'Diamonds ' + gemN; } });
+})();
+</script>
+</body></html>

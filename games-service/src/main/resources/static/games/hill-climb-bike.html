@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Hill Climb Bike</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+<div class="tc l"><div class="tb" data-act="left">BRAKE</div></div><div class="tc r"><div class="tb" data-act="right">GAS</div></div>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var R = 14, B, camX, camY, coins, cans, nextCoin, nextCan, fuel, flips, coinN, rotAcc, stuck, farthest, msg, msgT;
+
+  function amp(x) { return 0.35 + Math.min(0.65, x / 9000); }
+  function smooth(a, b, x) { var t = GK.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+  function hash(n) { var v = Math.sin(n * 91.3458) * 47453.5453; return v - Math.floor(v); }
+  /* Every 1200 px a stunt ramp may rise and then DROP away like a cliff: the bike launches, so there is air time
+     (to tilt with gas/brake and land flat or flip), and the jumps get bigger the further you go. */
+  function ramp(x) {
+    var seg = Math.floor(x / 1200);
+    if (seg < 1 || hash(seg) < 0.35) return 0;
+    var u = (x - seg * 1200) / 1200;
+    var H = 45 + Math.min(90, seg * 6) * (0.6 + 0.4 * hash(seg + 7));
+    return H * (smooth(0.5, 0.72, u) - smooth(0.72, 0.76, u));
+  }
+  function gy(x) {
+    var f = GK.clamp(x / 500, 0, 1);
+    return GK.h * 0.62 - f * amp(x) * (62 * Math.sin(x * 0.0036) + 30 * Math.sin(x * 0.0098 + 1.7) + 12 * Math.sin(x * 0.022)) - ramp(x);
+  }
+  function slope(x) { return Math.atan2(gy(x + 2) - gy(x - 2), 4); }       // + = downhill (y grows downward)
+  function norm(a) { while (a > Math.PI) a -= 6.2832; while (a < -Math.PI) a += 6.2832; return a; }
+
+  function reset() {
+    B = { x: 100, y: gy(100) - R, sp: 0, vx: 0, vy: 0, ang: 0, angv: 0, lift: 0, ground: true };
+    camX = B.x - GK.w * 0.3; camY = B.y - GK.h * 0.5;
+    coins = []; cans = []; nextCoin = 500; nextCan = 1300;
+    fuel = 100; flips = 0; coinN = 0; rotAcc = 0; stuck = 0; farthest = 0; msg = ''; msgT = 0;
+  }
+  function say(t) { msg = t; msgT = 1.4; }
+
+  function update(dt) {
+    var k = GK.keys, i;
+    var gas = (k.right || k.up || k.act) && fuel > 0, brake = k.left || k.down;
+    var s = slope(B.x);
+    fuel = Math.max(0, fuel - (gas ? 7 : 1.2) * dt);
+
+    if (B.ground) {
+      B.sp += (gas ? 520 : 0) * dt;
+      if (brake) B.sp -= (B.sp > 0 ? 760 : 260) * dt;
+      B.sp += 800 * Math.sin(s) * dt;
+      B.sp -= (B.sp * 0.2 + 0.0025 * B.sp * Math.abs(B.sp)) * dt;
+      B.sp = GK.clamp(B.sp, -160, 900);
+      var torque = gas ? 0.9 * GK.clamp(1 - B.sp / 260, 0, 1) * (1 + Math.max(0, -Math.sin(s)) * 3) : 0;
+      B.lift += (torque - B.lift * 2.2 - (brake ? 1.2 : 0)) * dt;
+      B.lift = Math.max(0, B.lift);
+      if (B.lift > 1.25) { GK.gameOver('Flipped over!'); return; }
+
+      var nx = B.x + B.sp * Math.cos(s) * dt;
+      var ballistic = B.y + B.sp * Math.sin(s) * dt;
+      var ground = gy(nx) - R;
+      B.x = nx;
+      if (ground > ballistic + 1.5 && B.sp > 120) {                      // the hill fell away faster than we move: take off
+        B.ground = false; B.vx = B.sp * Math.cos(s); B.vy = B.sp * Math.sin(s); B.y = ballistic;
+        B.angv = 0; rotAcc = 0;
+      } else {
+        B.y = ground;
+      }
+      B.ang += (s - B.lift - B.ang) * Math.min(1, 12 * dt);
+      if (Math.abs(B.sp) < 8 && fuel <= 0) { stuck += dt; if (stuck > 1.5) { GK.gameOver('Out of fuel!'); return; } } else stuck = 0;
+    } else {
+      B.vy += 1100 * dt;
+      B.x += B.vx * dt; B.y += B.vy * dt;
+      if (gas) B.angv -= 7 * dt;           // gas lifts the nose
+      if (brake) B.angv += 7 * dt;         // brake dips it
+      B.angv -= B.angv * 0.8 * dt;
+      B.ang += B.angv * dt; rotAcc += B.angv * dt;
+      var gnd = gy(B.x) - R;
+      if (B.y >= gnd) {
+        var ss = slope(B.x), diff = Math.abs(norm(B.ang - ss));
+        if (diff > 0.9) { GK.gameOver('Bad landing!'); return; }
+        B.y = gnd; B.ground = true;
+        B.sp = B.vx * Math.cos(ss) + B.vy * Math.sin(ss);
+        if (diff > 0.55) { B.sp *= 0.5; say('Rough landing'); }
+        var turns = Math.round(Math.abs(rotAcc) / 6.2832);
+        if (turns >= 1) { flips += turns; say(turns > 1 ? turns + ' FLIPS! +' + (turns * 50) : 'FLIP! +50'); }
+        rotAcc = 0; B.lift = 0; B.angv = 0;
+      }
+    }
+
+    farthest = Math.max(farthest, B.x - 100);
+    GK.score = farthest / 10 + flips * 50 + coinN * 10;
+
+    while (nextCoin < B.x + GK.w * 1.2) { coins.push({ x: nextCoin, y: gy(nextCoin) - 46 }); nextCoin += GK.rand(120, 260); }
+    while (nextCan < B.x + GK.w * 1.2) { cans.push({ x: nextCan, y: gy(nextCan) - 50 }); nextCan += GK.rand(1100, 1700); }
+    for (i = coins.length - 1; i >= 0; i--) {
+      if (coins[i].x < B.x - GK.w) { coins.splice(i, 1); continue; }
+      if (Math.abs(coins[i].x - B.x) < 30 && Math.abs(coins[i].y - (B.y - 10)) < 36) { coinN++; coins.splice(i, 1); }
+    }
+    for (i = cans.length - 1; i >= 0; i--) {
+      if (cans[i].x < B.x - GK.w) { cans.splice(i, 1); continue; }
+      if (Math.abs(cans[i].x - B.x) < 34 && Math.abs(cans[i].y - (B.y - 10)) < 40) { fuel = Math.min(100, fuel + 45); cans.splice(i, 1); say('Fuel +45'); }
+    }
+    camX += ((B.x - GK.w * 0.3) - camX) * Math.min(1, 6 * dt);
+    camY += ((B.y - GK.h * 0.5) - camY) * Math.min(1, 3 * dt);
+    msgT = Math.max(0, msgT - dt);
+  }
+
+  function draw(ctx, w, h) {
+    var i, sky = ctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#0b3a68'); sky.addColorStop(0.6, '#1d4f8a'); sky.addColorStop(1, '#5a3205');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(w * 0.75, h * 0.22, 40, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#17497f'; ctx.beginPath(); ctx.moveTo(0, h);
+    for (var px = 0; px <= w; px += 12) ctx.lineTo(px, h * 0.6 - 70 * Math.abs(Math.sin((px + camX * 0.15) * 0.006)) - 30 * Math.sin((px + camX * 0.15) * 0.019));
+    ctx.lineTo(w, h); ctx.fill();
+
+    ctx.beginPath(); ctx.moveTo(0, h);
+    for (var sx = 0; sx <= w + 6; sx += 6) ctx.lineTo(sx, gy(camX + sx) - camY);
+    ctx.lineTo(w + 6, h); ctx.closePath();
+    var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#6b4a0a'); g.addColorStop(1, '#4a350a');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 4; ctx.beginPath();
+    for (sx = 0; sx <= w + 6; sx += 6) { var yy = gy(camX + sx) - camY; if (sx === 0) ctx.moveTo(sx, yy); else ctx.lineTo(sx, yy); }
+    ctx.stroke();
+
+    for (i = 0; i < coins.length; i++) {
+      var cx = coins[i].x - camX, cy = coins[i].y - camY;
+      ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#b8860b'; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 6.2832); ctx.fill();
+    }
+    for (i = 0; i < cans.length; i++) {
+      var fx = cans[i].x - camX, fy = cans[i].y - camY;
+      GK.rr(ctx, fx - 12, fy - 16, 24, 32, 5); ctx.fillStyle = '#16a34a'; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('F', fx, fy + 5);
+    }
+    drawBike(ctx, B.x - camX, B.y - camY, B.ang);
+
+    ctx.fillStyle = 'rgba(10,55,100,.75)'; ctx.fillRect(12, 44, 170, 14);
+    ctx.fillStyle = fuel > 25 ? '#22c55e' : '#ef4444'; ctx.fillRect(13, 45, 168 * fuel / 100, 12);
+    ctx.fillStyle = '#ffd700'; ctx.font = 'bold 11px Georgia'; ctx.textAlign = 'left'; ctx.fillText('FUEL', 14, 62);
+    if (msgT > 0) { ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = '#ffd700'; ctx.font = 'bold 26px Georgia'; ctx.textAlign = 'center'; ctx.fillText(msg, w / 2, h * 0.25); ctx.globalAlpha = 1; }
+  }
+
+  function drawBike(ctx, x, y, a) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    var wx = [-26, 26], i;
+    for (i = 0; i < 2; i++) {
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(wx[i], 0, R - 2, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(wx[i], 0, R - 2, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1.5; ctx.beginPath();
+      var sp = (B.x * 0.07) + i; ctx.moveTo(wx[i] + Math.cos(sp) * 11, Math.sin(sp) * 11); ctx.lineTo(wx[i] - Math.cos(sp) * 11, -Math.sin(sp) * 11);
+      ctx.moveTo(wx[i] + Math.cos(sp + 1.57) * 11, Math.sin(sp + 1.57) * 11); ctx.lineTo(wx[i] - Math.cos(sp + 1.57) * 11, -Math.sin(sp + 1.57) * 11); ctx.stroke();
+    }
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(-8, -18); ctx.lineTo(14, -20); ctx.lineTo(26, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(14, -20); ctx.lineTo(20, -36); ctx.lineTo(30, -38); ctx.stroke();
+    ctx.fillStyle = '#b8860b'; GK.rr(ctx, -10, -24, 22, 13, 4); ctx.fill();
+    ctx.fillStyle = '#e11d48'; GK.rr(ctx, -22, -30, 26, 8, 4); ctx.fill();
+    ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-9, -32); ctx.lineTo(-2, -54); ctx.lineTo(18, -50); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, -31); ctx.lineTo(4, -16); ctx.stroke();
+    ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.arc(22, -64, 9, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(22, -66, 10, Math.PI, 0); ctx.fill();
+    ctx.restore();
+  }
+
+  GK.start({ id: 'hill-climb-bike', title: 'Hill Climb Bike', tip: 'Right/Up = gas, Left/Down = brake. In the air they tilt the bike - land flat, spin a full flip for bonus. Grab green fuel cans!',
+             reset: reset, update: update, draw: draw, hud: function () { return Math.round(farthest / 10) + ' m  Flips ' + flips; } });
+})();
+</script>
+</body></html>

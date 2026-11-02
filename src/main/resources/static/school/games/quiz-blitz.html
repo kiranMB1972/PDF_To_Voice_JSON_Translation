@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Quiz Blitz - School games</title>
+    <link rel="stylesheet" href="../../css/gold.css"/>
+    <link rel="stylesheet" href="../../css/visual-errors.css"/>
+    <link rel="stylesheet" href="../school.css"/>
+    <link rel="stylesheet" href="games.css"/>
+</head>
+<body class="pop game">
+<div class="pop-bar"><h1 class="gold3d"><span id="gtitle">Quiz Blitz</span> <small id="glevel"></small></h1></div>
+<main class="pop-main"><div class="gm">
+    <div id="notice" class="notice" hidden></div>
+    <div class="hud3"><div><span>Score</span><b id="score">0</b></div><div><span id="l2">Seconds</span><b id="t2">15</b></div><div><span>Best</span><b id="best">-</b></div></div>
+    <div class="stage" id="stage"></div>
+    <div class="card board" id="board"></div>
+</div></main>
+<script src="../../js/visual-errors.js"></script>
+<script src="../school-common.js"></script>
+<script src="edu-games.js"></script>
+<script src="game-common.js"></script>
+<script>
+var K = GameKit, el = K.el, G = EduGames, $ = function (i) { return document.getElementById(i); }, stage = $('stage');
+function clr(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function setScore(v) { $('score').textContent = v; }
+function over(score, msg) {
+  clr(stage); stage.appendChild(el('div', { class: 'bigq', text: msg })); stage.appendChild(el('p', { text: 'You scored ' + score + ' points' }));
+  K.finish(score).then(function (best) { $('best').textContent = best; }); K.confetti(innerWidth / 2, innerHeight / 3, 90);
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '↻ Play again', onclick: function () { go(); } }));
+}
+
+var ctx, qs, i, score, streak, left, tm, used50, answered;
+function show() {
+  if (i >= qs.length) { clearInterval(tm); return over(score, 'Quiz complete! 🎉'); }
+  var q = qs[i]; answered = false; left = 15; $('t2').textContent = left; clr(stage);
+  stage.appendChild(el('div', { class: 'tbar' }, [el('i', { id: 'tb', style: 'width:100%' })]));
+  stage.appendChild(el('p', { text: q.subject + '  -  question ' + (i + 1) + ' of ' + qs.length + (streak > 1 ? '   🔥 ' + streak : '') }));
+  stage.appendChild(el('div', { class: 'bigq', style: 'font-size:clamp(1.4rem,4vw,2.2rem)', text: q.q }));
+  var box = el('div', { class: 'choices' }); q.options.forEach(function (o, k) { box.appendChild(el('button', { type: 'button', 'data-k': String(k + 1), text: o, onclick: function (e) { pick(k, e.target); } })); }); stage.appendChild(box);
+  stage.appendChild(el('p', null, [el('button', { type: 'button', text: used50 ? '50:50 used' : '✂ 50:50', disabled: used50, onclick: function (e) { fifty(); e.target.disabled = true; } })]));
+  clearInterval(tm); tm = setInterval(function () { left--; $('t2').textContent = left; $('tb').style.width = (left / 15 * 100) + '%'; if (left <= 0) { pick(-1, null); } }, 1000);
+}
+function fifty() { used50 = true; var q = qs[i], wrong = []; q.options.forEach(function (o, k) { if (k !== q.answer) wrong.push(k); }); G.shuffle(Math.random, wrong).slice(0, 2).forEach(function (k) { stage.querySelector('[data-k="' + (k + 1) + '"]').classList.add('gone'); }); }
+function pick(k, btn) {
+  if (answered) return; answered = true; clearInterval(tm); var q = qs[i], btns = stage.querySelectorAll('.choices button');
+  btns[q.answer].classList.add('good');
+  if (k === q.answer) { streak++; score += G.quizPoints(left, streak); setScore(score); K.burstAt(btn); } else { streak = 0; if (btn) btn.classList.add('bad'); }
+  i++; setTimeout(show, 1100);
+}
+function go() { qs = G.quizQuestions(ctx.level, 12); i = 0; score = 0; streak = 0; used50 = false; setScore(0); show(); }
+document.addEventListener('keydown', function (e) { var b = stage.querySelector('[data-k="' + e.key + '"]'); if (b && !answered) b.click(); });
+K.boot('quiz-blitz', 'Quiz Blitz').then(function (c) {
+  ctx = c; clr(stage); stage.appendChild(el('div', { class: 'bigq', text: '12 fast questions' }));
+  stage.appendChild(el('p', { text: '15 seconds each. Quick answers and streaks give more points. Keys 1-4 work too.' }));
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '▶ Start', onclick: go }));
+});
+</script>
+</body>
+</html>

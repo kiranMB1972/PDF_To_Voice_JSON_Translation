@@ -1,0 +1,86 @@
+server:
+  port: ${PORT:8089}
+  shutdown: graceful
+
+spring:
+  application:
+    name: pdf-voice-and-games
+  threads:
+    virtual:
+      enabled: true            # Tomcat request threads are Java 21 virtual threads
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 205MB
+  # --- School module: cloud MySQL (Aiven). The DB password lives in config/db-secret.properties, NOT here.
+  config:
+    import: optional:file:./config/db-secret.properties
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql-3e474346-suryahomestay1234.e.aivencloud.com}:${DB_PORT:11591}/${DB_NAME:defaultdb}?sslMode=REQUIRED&characterEncoding=UTF-8&connectionTimeZone=UTC
+    username: ${DB_USER:avnadmin}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 15000
+      initialization-fail-timeout: -1      # never fail the whole app because the cloud DB is asleep
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none                       # tables are created lazily by the School module (school/schema.sql)
+    database-platform: org.hibernate.dialect.MySQLDialect
+    properties:
+      hibernate.boot.allow_jdbc_metadata_access: false
+
+pdf-voice:
+  upload-timeout-ms: 300000    # 5 minutes for one PDF analysis
+  max-pages: 1000
+  max-chars: 2000000           # beyond this the rest of the book is marked "not read" (never silently dropped)
+
+translate:
+  prefer: auto                 # auto = Ollama when it is running, otherwise the free online translator; "ollama" or "web" forces one
+  web:
+    enabled: true              # false = nothing ever leaves this computer (then Ollama is required for translation)
+    timeout-ms: 25000
+  timeout-ms: 180000
+  max-text-chars: 60000
+  ollama:                      # free, local. Optional: without it the app reads the original text aloud.
+    base-url: http://localhost:11434
+    model: llama3.1
+    connect-timeout-ms: 2000
+    read-timeout-ms: 170000
+
+games:
+  service:
+    url: http://localhost:8095      # the separate Games microservice (folder games-service)
+
+app:
+  auto-open-browser: true      # opens http://localhost:<port> in Microsoft Edge once, after start-up
+  browser: msedge
+  browser-isolated-profile: true   # Edge opens with its own small profile so Stop_Application.bat can close ONLY this window
+  browser-profile-dir: ''          # blank = %LOCALAPPDATA%\\PdfVoiceAndGames\\edge-profile
+
+# Optional paid engines, OFF unless a key is present (the free default is the browser's Edge Natural voices).
+azure:
+  speech:
+    key: ${AZURE_SPEECH_KEY:}
+sarvam:
+  api-key: ${SARVAM_API_KEY:}
+
+logging:
+  level:
+    com.org.pdfplatform: INFO
+    org.apache.pdfbox: WARN
+    org.apache.pdfbox.pdmodel.font.PDType0Font: ERROR      # hides the harmless "No Unicode mapping for CID" Nudi-font warnings
+    org.apache.fontbox: ERROR
+
+# ---------------------------------------------------------------------------------------------------------------
+# School module (Admin / Student). The cloud DB is optional at start-up: if it is unreachable the PDF reader keeps
+# working and only the School screens show the "database offline" page. The DB password is NOT here - it lives in
+# config/db-secret.properties (or the environment variable SPRING_DATASOURCE_PASSWORD).
+school:
+  zone: Asia/Kolkata                       # "today" for tests is decided in this time zone
+  tests-dir: ./tests                       # a copy of every Test<DD-MM-YYYY>.properties / .json is written here
+  show-answers-after-submit: true
+  admin:
+    username: admin
+    initial-password: ${ADMIN_INITIAL_PASSWORD:}   # blank = random, written to config/FIRST_ADMIN_LOGIN.txt on first start

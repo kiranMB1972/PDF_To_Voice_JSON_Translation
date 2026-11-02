@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Admin Console - School</title>
+    <link rel="stylesheet" href="../css/gold.css"/>
+    <link rel="stylesheet" href="../css/visual-errors.css"/>
+    <link rel="stylesheet" href="school.css"/>
+</head>
+<body class="pop">
+<div class="pop-bar">
+    <h1 class="gold3d">ADMIN SCREEN <small id="schoolName"></small></h1>
+    <button type="button" id="renameBtn" class="sm" title="Only the admin can change the school name">✎ Edit school name</button>
+    <button type="button" id="logoutBtn" class="sm ghost2">Log out</button>
+</div>
+<main class="pop-main">
+    <div id="notice" class="notice" hidden></div>
+    <div id="tabs" class="tabs"></div>
+    <div id="view"></div>
+</main>
+<script src="../js/visual-errors.js"></script>
+<script src="school-common.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

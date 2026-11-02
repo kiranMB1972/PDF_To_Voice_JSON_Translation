@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Test - School</title>
+    <link rel="stylesheet" href="../css/gold.css"/>
+    <link rel="stylesheet" href="../css/visual-errors.css"/>
+    <link rel="stylesheet" href="school.css"/>
+</head>
+<body class="pop">
+<div class="pop-bar">
+    <h1 class="gold3d">STUDENT SCREEN <small id="testTitle">Test</small></h1>
+    <div class="timer" id="timer" hidden>--:--</div>
+</div>
+<main class="pop-main">
+    <div id="notice" class="notice" hidden></div>
+    <div class="card" id="readbar" hidden>
+        <div class="row">
+            <label>Read &amp; translate the questions in
+                <select id="lang">
+                    <option value="">Original (English)</option><option value="kn">Kannada</option><option value="ta">Tamil</option><option value="te">Telugu</option><option value="ml">Malayalam</option>
+                    <option value="ur">Urdu</option><option value="hi">Hindi</option><option value="mr">Marathi</option><option value="es">Spanish</option><option value="fr">French</option>
+                </select></label>
+            <button type="button" id="stopSpeech" class="ghost2 sm">■ Stop voice</button>
+        </div>
+        <small>Press 🔊 on a question to hear it in the chosen language. Your answers stay as you tick them.</small>
+    </div>
+    <div id="view"></div>
+</main>
+<script src="../js/visual-errors.js"></script>
+<script src="school-common.js"></script>
+<script src="test.js"></script>
+</body>
+</html>

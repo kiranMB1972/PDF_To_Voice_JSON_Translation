@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Word Unscramble - School games</title>
+    <link rel="stylesheet" href="../../css/gold.css"/>
+    <link rel="stylesheet" href="../../css/visual-errors.css"/>
+    <link rel="stylesheet" href="../school.css"/>
+    <link rel="stylesheet" href="games.css"/>
+</head>
+<body class="pop game">
+<div class="pop-bar"><h1 class="gold3d"><span id="gtitle">Word Unscramble</span> <small id="glevel"></small></h1></div>
+<main class="pop-main"><div class="gm">
+    <div id="notice" class="notice" hidden></div>
+    <div class="hud3"><div><span>Score</span><b id="score">0</b></div><div><span id="l2">Seconds</span><b id="t2">120</b></div><div><span>Best</span><b id="best">-</b></div></div>
+    <div class="stage" id="stage"></div>
+    <div class="card board" id="board"></div>
+</div></main>
+<script src="../../js/visual-errors.js"></script>
+<script src="../school-common.js"></script>
+<script src="edu-games.js"></script>
+<script src="game-common.js"></script>
+<script>
+var K = GameKit, el = K.el, G = EduGames, $ = function (i) { return document.getElementById(i); }, stage = $('stage');
+function clr(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function setScore(v) { $('score').textContent = v; }
+function over(score, msg) {
+  clr(stage); stage.appendChild(el('div', { class: 'bigq', text: msg })); stage.appendChild(el('p', { text: 'You scored ' + score + ' points' }));
+  K.finish(score).then(function (best) { $('best').textContent = best; }); K.confetti(innerWidth / 2, innerHeight / 3, 90);
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '↻ Play again', onclick: function () { go(); } }));
+}
+
+var ctx, words, idx, score, left, tm, word, built, hints, tiles;
+function next() {
+  if (idx >= words.length) { clearInterval(tm); return over(score, 'All words done! 🎉'); }
+  word = words[idx]; built = []; hints = 0; var sc = G.scramble(word); tiles = sc.split(''); draw();
+}
+function draw() {
+  clr(stage); stage.appendChild(el('p', { text: 'Word ' + (idx + 1) + ' of ' + words.length + '  -  tap the letters in order' }));
+  var slots = el('div', { class: 'tiles' }); for (var i = 0; i < word.length; i++) slots.appendChild(el('div', { class: 'tile slot', text: built[i] ? built[i].ch : '' })); stage.appendChild(slots);
+  var pool = el('div', { class: 'tiles' });
+  tiles.forEach(function (ch, i) { pool.appendChild(el('div', { class: 'tile' + (built.some(function (b) { return b.i === i; }) ? ' used' : ''), text: ch, onclick: function () { built.push({ ch: ch, i: i }); check(); } })); });
+  stage.appendChild(pool);
+  stage.appendChild(el('div', null, [el('button', { type: 'button', text: '⌫ Undo', onclick: function () { built.pop(); draw(); } }), ' ', el('button', { type: 'button', text: '💡 Hint (-5)', onclick: function () { hint(); } }), ' ', el('button', { type: 'button', text: 'Skip', onclick: function () { idx++; next(); } })]));
+}
+function hint() { hints++; built = []; for (var i = 0; i < Math.min(hints, word.length - 1); i++) { var j = tiles.findIndex(function (ch, k) { return ch === word[i] && !built.some(function (b) { return b.i === k; }); }); built.push({ ch: word[i], i: j }); } draw(); }
+function check() {
+  draw(); if (built.length < word.length) return;
+  if (built.map(function (b) { return b.ch; }).join('') === word) { score += Math.max(5, 20 + word.length * 2 - hints * 5); setScore(score); K.confetti(innerWidth / 2, innerHeight / 2, 50); idx++; setTimeout(next, 350); }
+  else { stage.classList.add('bad'); setTimeout(function () { built = []; draw(); }, 350); }
+}
+function go() { words = G.shuffle(Math.random, G.wordList(ctx.level)).slice(0, 8); idx = 0; score = 0; left = 120; setScore(0); $('t2').textContent = left; next(); clearInterval(tm);
+  tm = setInterval(function () { left--; $('t2').textContent = left; if (left <= 0) { clearInterval(tm); over(score, "Time's up!"); } }, 1000); }
+K.boot('word-unscramble', 'Word Unscramble').then(function (c) {
+  ctx = c; clr(stage); stage.appendChild(el('div', { class: 'bigq', text: 'Fix the jumbled words' }));
+  stage.appendChild(el('p', { text: '8 words in 2 minutes. Hints cost points.' }));
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '▶ Start', onclick: go }));
+});
+</script>
+</body>
+</html>

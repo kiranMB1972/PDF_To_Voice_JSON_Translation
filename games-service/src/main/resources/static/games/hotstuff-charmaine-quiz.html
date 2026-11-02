@@ -1,0 +1,72 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Hotstuff & Charmaine Quiz</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var BANK = [
+    ['What is Hotstuff?', 'A little devil with a kind heart', 'A big grey wolf', 'A sleepy dragon'],
+    ['What is Princess Charmaine\'s power?', 'Sparkle magic', 'Ice breath', 'An invisible cloak'],
+    ['Which game trains your memory?', 'Memory Flip', 'Highway Racer', 'Moto Dash'],
+    ['How many colours are in a rainbow?', 'Seven', 'Three', 'Twelve'],
+    ['What do plants need to make their food?', 'Sunlight', 'Moonlight', 'Candy'],
+    ['Which planet do we live on?', 'Earth', 'Mars', 'Jupiter'],
+    ['What do bees make?', 'Honey', 'Milk', 'Butter'],
+    ['What is 7 + 5?', '12', '11', '14'],
+    ['Which is the capital of Karnataka?', 'Bengaluru', 'Chennai', 'Hyderabad'],
+    ['In which direction does the sun rise?', 'East', 'West', 'South'],
+    ['Which is the largest animal in the world?', 'Blue whale', 'Elephant', 'Giraffe'],
+    ['How many days are in a week?', 'Seven', 'Five', 'Ten']
+  ];
+  var qs, qi, shown, tleft, feedback, correctN, score;
+  var boxes = [];
+
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function load(i) { var q = qs[i]; var opts = shuffle([q[1], q[2], q[3]]); shown = { q: q[0], opts: opts, right: opts.indexOf(q[1]) }; tleft = 15; feedback = null; }
+  function reset() { qs = shuffle(BANK.slice()).slice(0, 10); qi = 0; correctN = 0; score = 0; load(0); }
+
+  function answer(i) {
+    if (feedback) return;
+    if (i === shown.right) { var pts = 100 + Math.ceil(tleft) * 5; score += pts; correctN++; feedback = { ok: true, t: 1.1, pick: i }; }
+    else feedback = { ok: false, t: 1.4, pick: i };
+    GK.score = score;
+  }
+  function next() { qi++; if (qi >= qs.length) { GK.score = score; GK.gameOver('Quiz finished - ' + correctN + ' / ' + qs.length); return; } load(qi); }
+
+  function layout(w, h) {
+    boxes = []; var bw = Math.min(w - 40, 560), bh = Math.max(44, Math.min(70, (h - 260) / 3 - 10)), x = (w - bw) / 2, y = 170;
+    for (var i = 0; i < 3; i++) boxes.push({ x: x, y: y + i * (bh + 12), w: bw, h: bh });
+  }
+
+  function update(dt) {
+    layout(GK.w, GK.h);
+    var t; while ((t = GK.takeTap())) for (var i = 0; i < boxes.length; i++) { var b = boxes[i]; if (t.x >= b.x && t.x <= b.x + b.w && t.y >= b.y && t.y <= b.y + b.h) answer(i); }
+    if (GK.pressed('k1')) answer(0); if (GK.pressed('k2')) answer(1); if (GK.pressed('k3')) answer(2);
+    if (feedback) { feedback.t -= dt; if (feedback.t <= 0) next(); }
+    else { tleft -= dt; if (tleft <= 0) { feedback = { ok: false, t: 1.4, pick: -1 }; } }
+  }
+
+  function draw(ctx, w, h) {
+    layout(w, h);
+    var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#0f4c85'); g.addColorStop(1, '#2d7cc4'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#ffd700'; ctx.font = 'bold 15px Georgia'; ctx.fillText('Question ' + (qi + 1) + ' of ' + qs.length, w / 2, 62);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.min(26, Math.floor(w / 18)) + 'px Georgia'; ctx.fillText(shown.q, w / 2, 112, w - 30);
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(w / 2 - 150, 128, 300, 8); ctx.fillStyle = tleft > 5 ? '#ffd700' : '#ff8a65'; ctx.fillRect(w / 2 - 150, 128, 300 * Math.max(0, tleft) / 15, 8);
+    shown.opts.forEach(function (o, i) {
+      var b = boxes[i]; GK.rr(ctx, b.x, b.y, b.w, b.h, 14);
+      var fill = '#ffe27a';
+      if (feedback) { if (i === shown.right) fill = '#8be39a'; else if (i === feedback.pick) fill = '#ff9c8a'; else fill = '#cfe3f5'; }
+      ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#4a3200'; ctx.font = 'bold 20px Georgia'; ctx.textAlign = 'left'; ctx.fillText((i + 1) + '.  ' + o, b.x + 18, b.y + b.h / 2 + 7, b.w - 30);
+    });
+    if (feedback) { ctx.textAlign = 'center'; ctx.font = 'bold 24px Georgia'; ctx.fillStyle = feedback.ok ? '#b6f7c3' : '#ffd0c8'; ctx.fillText(feedback.ok ? 'Correct!' : (feedback.pick < 0 ? 'Time is up!' : 'Not quite'), w / 2, boxes[2].y + boxes[2].h + 44); }
+    ctx.textAlign = 'left';
+  }
+
+  GK.start({ id: 'hotstuff-charmaine-quiz', title: 'Hotstuff & Charmaine Quiz', tip: 'Ten questions, 15 seconds each. Tap an answer or press 1, 2 or 3. Faster answers score more!',
+             reset: reset, update: update, draw: draw, hud: function () { return 'Right ' + correctN; } });
+  GK.test = { right: function () { return shown.right; }, answer: answer, state: function () { return { qi: qi, correct: correctN, score: score }; } };
+})();
+</script>
+</body></html>

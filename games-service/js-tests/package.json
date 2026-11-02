@@ -1,0 +1,11 @@
+{
+  "name": "pdf-voice-and-games-js-tests",
+  "private": true,
+  "description": "Headless play-through of every game (jsdom). Run: npm install && npm test",
+  "scripts": {
+    "test": "node --test games.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

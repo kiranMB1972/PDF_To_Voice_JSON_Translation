@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Charmaine Star Catcher</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+<div class="tc l"><div class="tb" data-act="left">&#9664;</div></div><div class="tc r"><div class="tb" data-act="right">&#9654;</div></div>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var P, items, lives, spawnT, caught, hit;
+  function reset() { P = { x: GK.w / 2, w: 70 }; items = []; lives = 3; spawnT = 0.5; caught = 0; hit = 0; }
+  function update(dt) {
+    var k = GK.keys, sp = 520;
+    if (k.left) P.x -= sp * dt; if (k.right) P.x += sp * dt;
+    if (GK.ptr.down) P.x += (GK.ptr.x - P.x) * Math.min(1, 14 * dt);
+    P.x = GK.clamp(P.x, 40, GK.w - 40);
+    var fall = 170 + Math.min(260, GK.time * 4.5);
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      var r = Math.random(), kind = r < 0.62 ? 'star' : (r < 0.78 ? 'heart' : 'ember');
+      items.push({ x: GK.rand(30, GK.w - 30), y: 40, kind: kind, vy: fall * GK.rand(0.85, 1.2) });
+      spawnT = GK.clamp(0.8 - GK.time * 0.006, 0.28, 0.8);
+    }
+    var py = GK.h - 70;
+    for (var i = items.length - 1; i >= 0; i--) {
+      var it = items[i]; it.y += it.vy * dt;
+      if (it.y >= py - 20 && it.y <= py + 24 && Math.abs(it.x - P.x) < P.w / 2 + 10) {
+        if (it.kind === 'ember') { lives--; hit = 0.4; if (lives <= 0) { GK.gameOver('The embers won this time!'); return; } }
+        else { caught += it.kind === 'heart' ? 25 : 10; }
+        items.splice(i, 1);
+      } else if (it.y > GK.h + 30) items.splice(i, 1);
+    }
+    GK.score = caught; hit = Math.max(0, hit - dt);
+  }
+  function draw(ctx, w, h) {
+    var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#0b3a68'); g.addColorStop(1, '#3b8fd9'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '30px ' + GK.EMOJI;
+    items.forEach(function (it) { ctx.fillText(it.kind === 'star' ? '\u2B50' : (it.kind === 'heart' ? '\uD83D\uDC96' : '\uD83D\uDD25'), it.x, it.y); });
+    ctx.fillStyle = 'rgba(255,215,0,.35)'; GK.rr(ctx, P.x - P.w / 2, h - 52, P.w, 12, 6); ctx.fill();
+    ctx.font = '48px ' + GK.EMOJI; ctx.globalAlpha = hit > 0 && Math.floor(hit * 20) % 2 ? 0.4 : 1; ctx.fillText('\uD83D\uDC51', P.x, h - 76); ctx.globalAlpha = 1;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  GK.start({ id: 'charmaine-star-catcher', title: 'Charmaine Star Catcher', tip: 'Slide the princess with Left / Right (or drag). Catch stars and hearts, dodge the embers. Three lives!',
+             reset: reset, update: update, draw: draw, hud: function () { var s = ''; for (var i = 0; i < lives; i++) s += '\u2665 '; return 'Lives ' + s; } });
+  GK.test = { items: function () { return items.map(function (i) { return { x: i.x, y: i.y, kind: i.kind }; }); }, player: function () { return P.x; }, lives: function () { return lives; } };
+})();
+</script>
+</body></html>

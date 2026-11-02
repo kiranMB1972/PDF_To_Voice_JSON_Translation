@@ -1,0 +1,11 @@
+{
+  "name": "pdf-voice-and-games-js-tests",
+  "private": true,
+  "description": "Optional browser-level tests (jsdom). speech.test.js needs nothing; ui.test.js needs: npm install",
+  "scripts": {
+    "test": "node --test speech.test.js ui.test.js hud.test.js edu-games.test.js visual-errors.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

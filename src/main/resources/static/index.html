@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>PDF Voice And Games</title>
+    <link rel="stylesheet" href="css/gold.css"/>
+    <link rel="stylesheet" href="css/visual-errors.css"/>
+    <link rel="stylesheet" href="school/school.css"/>
+</head>
+<body>
+<header class="topbar">
+    <div class="hud" id="hud">
+        <div class="compass" id="compass" role="img" aria-label="Compass" title="Live compass. Phones/tablets/2-in-1 PCs use the magnetic sensor (click to allow). A desktop PC has no sensor: North stays up and the Sun marker shows where the Sun really is.">
+            <svg viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="30" fill="#14508a" stroke="#ffd700" stroke-width="3"/>
+                <g class="rose" id="compassRose">
+                    <text x="32" y="14" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffd700">N</text>
+                    <text x="54" y="36" text-anchor="middle" font-size="8" fill="#e6f2ff">E</text>
+                    <text x="32" y="60" text-anchor="middle" font-size="8" fill="#e6f2ff">S</text>
+                    <text x="10" y="36" text-anchor="middle" font-size="8" fill="#e6f2ff">W</text>
+                    <g stroke="#bcd7f5" stroke-width=".8" opacity=".8"><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(15 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(30 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(45 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(60 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(75 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(105 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(120 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(135 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(150 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(165 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(195 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(210 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(225 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(240 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(255 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(285 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(300 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(315 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(330 32 32)"/><line x1="32" y1="3.5" x2="32" y2="6.5" transform="rotate(345 32 32)"/></g>
+                    <polygon points="32,17 36,32 28,32" fill="#ff6b6b"/>
+                    <polygon points="32,47 36,32 28,32" fill="#e6f2ff"/>
+                    <g id="sunMark" style="display:none"><circle cx="32" cy="4.5" r="3.6" fill="#ffd700" stroke="#8a6508" stroke-width=".8"/></g>
+                </g>
+                <polygon points="32,1 35,7 29,7" fill="#ffffff"/>
+                <circle cx="32" cy="32" r="3" fill="#ffd700"/>
+            </svg>
+        </div>
+        <div class="hud-text">
+            <div id="clock" aria-live="off">--:--:-- --/---/----</div>
+            <div id="compassText">Compass: starting...</div>
+            <div id="sunText" class="sun-text"></div>
+        </div>
+    </div>
+    <div class="gamesbox">
+        <label for="gamesSel">Entertainment Games</label>
+        <select id="gamesSel" aria-label="Entertainment Games">
+            <option value="">Entertainment Games - loading...</option>
+        </select>
+    </div>
+</header>
+
+<div class="page">
+<main class="shell">
+    <h1 class="gold-3d">PDF Voice HD - South Indian Accent + Gold Highlight</h1>
+    <p class="sub"><span id="greeting">Welcome</span> - upload a PDF, see the text that will be read, translate it, and listen with a free Microsoft Edge Natural voice.</p>
+
+    <div id="notice" class="notice" hidden role="alert"></div>
+
+    <section class="panel">
+        <div class="row">
+            <input type="file" id="pdfFile" accept="application/pdf,.pdf"/>
+            <button id="analyzeBtn">Analyze</button>
+            <span id="engineChip" class="chip">Translation engine: checking...</span>
+            <button id="selfTestBtn" type="button" class="ghost" title="Shows which translation engine answers for the chosen language, or exactly why it fails">Test translation</button>
+        </div>
+        <div class="row">
+            <label>Read / translate to
+                <select id="targetSel"></select>
+            </label>
+            <label id="accentWrap">South Indian accent
+                <select id="accentSel"></select>
+            </label>
+            <label id="modeWrap">Mode
+                <select id="modeSel">
+                    <option value="translate">Translate</option>
+                    <option value="orate">Orate (smooth to listen to)</option>
+                    <option value="teach">Teach (with word help)</option>
+                </select>
+            </label>
+        </div>
+        <div class="row">
+            <label>Voice
+                <select id="voiceSel"></select>
+            </label>
+            <label>Style
+                <select id="styleSel">
+                    <option value="warm">Warm</option>
+                    <option value="nila">Nila - private reading (slower, softer)</option>
+                </select>
+            </label>
+            <label>Speed
+                <select id="speedSel">
+                    <option value="0.8">Slow</option>
+                    <option value="0.92" selected>Easy</option>
+                    <option value="1">Normal</option>
+                    <option value="1.15">Fast</option>
+                </select>
+            </label>
+            <button id="sampleBtn" type="button" class="ghost">Hear sample</button>
+            <button id="checkBtn" type="button" class="ghost">Voice check</button>
+        </div>
+        <div id="voiceInfo" class="tiny"></div>
+    </section>
+
+    <section class="player">
+        <input type="range" id="progressBar" min="1" max="1" value="1" step="1" aria-label="Page"/>
+        <div class="row between">
+            <div>Page <span id="currentPage">0</span> / <span id="totalPages">0</span></div>
+            <div class="tiny" id="skipInfo"></div>
+        </div>
+        <div class="row">
+            <button id="prevBtn">Prev</button>
+            <button id="playBtn">Play</button>
+            <button id="stopBtn">Stop</button>
+            <button id="nextBtn">Next</button>
+            <span id="status" class="tiny"></span>
+        </div>
+        <div id="pageLinks" class="pagelinks" aria-label="Pages"></div>
+    </section>
+
+    <section class="two">
+        <div>
+            <h2>Original <span class="tiny" id="origTag"></span></h2>
+            <div id="origPanel" class="gold-highlight">Waiting...</div>
+        </div>
+        <div>
+            <h2>Reading now <span class="tiny" id="transTag"></span></h2>
+            <div id="readingPreview" class="gold-highlight">Waiting...</div>
+        </div>
+    </section>
+
+    <section>
+        <h2>JSON preview <span class="tiny" id="jsonTag">(first 3 readable pages, short)</span></h2>
+        <div class="json-actions">
+            <button id="jsonTransBtn" type="button" title="Translates the JSON data into the chosen language, then reads it aloud with that language's Natural voice (South Indian voices for Kannada, Tamil, Telugu, Malayalam, Urdu)">Translate JSON &amp; speak</button>
+            <button id="jsonOrigBtn" type="button" class="ghost">Original JSON</button>
+            <span id="jsonProgress" class="tiny"></span>
+        </div>
+        <pre id="jsonContainer" class="json-pretty">Upload a PDF...</pre>
+    </section>
+</main>
+<aside class="right-dock school" id="schoolPanel" aria-label="School panel"></aside>
+</div>
+
+<script src="js/visual-errors.js"></script>
+    <script src="school/school-common.js"></script>
+    <script src="js/speech.js"></script>
+<script src="js/app.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/games-menu.js"></script>
+<button type="button" id="schoolTab" class="school-tab" title="Open the School panel: Admin and Student login, tests, PDFs, live class, games">🎓 School</button>
+<script src="school/panel.js"></script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Moto Dash</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+<div class="tc l"><div class="tb" data-act="down">&#9660;</div></div><div class="tc r"><div class="tb" data-act="up">JUMP</div></div>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var bike, obs, coins, holes, dist, speed, nextX, coinN, held, wheel, puffs, falling;
+  function groundY() { return GK.h * 0.76; }
+  function bx() { return GK.w * 0.22; }
+
+  function reset() {
+    bike = { y: 0, vy: 0 }; obs = []; coins = []; holes = []; puffs = [];
+    dist = 0; speed = 330; nextX = 900; coinN = 0; held = false; wheel = 0; falling = false;
+  }
+
+  function overHole(wx) {
+    for (var i = 0; i < holes.length; i++) if (wx > holes[i].x0 + 14 && wx < holes[i].x1 - 14) return true;
+    return false;
+  }
+
+  function spawn() {
+    while (nextX < dist + GK.w + 500) {
+      var r = Math.random(), o;
+      if (r < 0.28) { var hw = speed * GK.rand(0.26, 0.38); holes.push({ x0: nextX, x1: nextX + hw }); o = { w: hw, hole: true }; }
+      else if (r < 0.58) { obs.push({ x: nextX, w: 26, h: 34, kind: 'cone' }); o = { w: 26 }; }
+      else if (r < 0.82) { obs.push({ x: nextX, w: 34, h: 42, kind: 'barrel' }); o = { w: 34 }; }
+      else { obs.push({ x: nextX, w: 46, h: 48, kind: 'crate' }); o = { w: 46 }; }
+      if (Math.random() < 0.7) {                      // an arc of coins above the obstacle
+        for (var i = 0; i < 5; i++) coins.push({ x: nextX + o.w / 2 + (i - 2) * 34, y: 70 + 44 * Math.sin(i / 4 * Math.PI) });
+      }
+      nextX += speed * GK.rand(0.95, 1.5) + o.w + 140;
+    }
+  }
+
+  function update(dt) {
+    var k = GK.keys, i;
+    speed = 330 + Math.min(400, dist / 45);
+    var wantJump = !!(k.up || k.act);
+    var onGround = bike.y <= 0.001 && !falling;
+    if (wantJump && onGround && !held) { bike.vy = 640; held = true; puffs.push({ x: 0, y: 4, t: 0.4 }); }
+    if (!wantJump) held = false;
+    var g = (bike.vy > 0 && wantJump) ? 1100 : 1900;
+    if (!onGround && k.down) g *= 1.7;
+    bike.vy -= g * dt; bike.y += bike.vy * dt;
+    var centre = dist + bx();
+    if (!falling && bike.y <= 0) {
+      if (overHole(centre)) falling = true; else { bike.y = 0; bike.vy = 0; }
+    }
+    if (falling && bike.y < -140) { GK.gameOver('Fell in the gap!'); return; }
+
+    dist += speed * dt; wheel += speed * dt / 15;
+    spawn();
+    GK.score = dist / 12 + coinN * 25;
+
+    for (i = obs.length - 1; i >= 0; i--) {
+      var o = obs[i];
+      if (o.x + o.w < dist - 100) { obs.splice(i, 1); continue; }
+      if (!falling && centre + 18 > o.x + 5 && centre - 18 < o.x + o.w - 5 && bike.y < o.h - 6) { GK.gameOver('Crashed!'); return; }
+    }
+    for (i = holes.length - 1; i >= 0; i--) if (holes[i].x1 < dist - 100) holes.splice(i, 1);
+    for (i = coins.length - 1; i >= 0; i--) {
+      var c = coins[i];
+      if (c.x < dist - 100) { coins.splice(i, 1); continue; }
+      if (Math.abs(c.x - centre) < 28 && Math.abs(c.y - (bike.y + 24)) < 36) { coinN++; coins.splice(i, 1); }
+    }
+    for (i = puffs.length - 1; i >= 0; i--) { puffs[i].t -= dt; puffs[i].x -= speed * dt * 0.6; if (puffs[i].t <= 0) puffs.splice(i, 1); }
+    if (bike.y <= 0 && !falling && Math.random() < 0.5) puffs.push({ x: -26, y: 6, t: 0.35 });
+  }
+
+  function hash(n) { var s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
+
+  function draw(ctx, w, h) {
+    var gy = groundY(), i;
+    var sky = ctx.createLinearGradient(0, 0, 0, gy);
+    sky.addColorStop(0, '#0b3a68'); sky.addColorStop(0.7, '#1d4f8a'); sky.addColorStop(1, '#6b3a05');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(w * 0.78, gy * 0.62, 46, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = 'rgba(255,215,0,.15)'; ctx.beginPath(); ctx.arc(w * 0.78, gy * 0.62, 78, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#17497f'; ctx.beginPath(); ctx.moveTo(0, gy);
+    for (var x = 0; x <= w; x += 10) ctx.lineTo(x, gy - 60 - 40 * Math.sin((x + dist * 0.08) * 0.01) - 20 * Math.sin((x + dist * 0.08) * 0.027));
+    ctx.lineTo(w, gy); ctx.fill();
+    var bw = 56, first = Math.floor((dist * 0.3) / bw);
+    for (i = first; i < first + w / bw + 2; i++) {
+      var bh = 40 + hash(i) * 110, sx = i * bw - dist * 0.3;
+      ctx.fillStyle = '#0f3b6b'; ctx.fillRect(sx, gy - bh, bw - 6, bh);
+      ctx.fillStyle = 'rgba(255,215,0,.35)';
+      for (var wy = gy - bh + 8; wy < gy - 8; wy += 16) if (hash(i * 7 + wy) > 0.55) ctx.fillRect(sx + 8 + hash(wy) * 24, wy, 6, 6);
+    }
+    ctx.fillStyle = '#2b4a6b'; ctx.fillRect(0, gy, w, h - gy);
+    ctx.fillStyle = '#ffd700'; ctx.fillRect(0, gy, w, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    for (var d = -(dist % 120); d < w; d += 120) ctx.fillRect(d, gy + (h - gy) * 0.45, 56, 5);
+    for (i = 0; i < holes.length; i++) {
+      var hx = holes[i].x0 - dist, hwid = holes[i].x1 - holes[i].x0;
+      ctx.fillStyle = '#07294a'; ctx.fillRect(hx, gy, hwid, h - gy);
+      ctx.fillStyle = '#b8860b'; ctx.fillRect(hx - 3, gy, 3, 10); ctx.fillRect(hx + hwid, gy, 3, 10);
+    }
+    for (i = 0; i < obs.length; i++) {
+      var o = obs[i], ox = o.x - dist;
+      if (o.kind === 'cone') { ctx.fillStyle = '#ff7a00'; ctx.beginPath(); ctx.moveTo(ox, gy); ctx.lineTo(ox + o.w, gy); ctx.lineTo(ox + o.w / 2, gy - o.h); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(ox + 7, gy - o.h * 0.5, o.w - 14, 5); }
+      else if (o.kind === 'barrel') { GK.rr(ctx, ox, gy - o.h, o.w, o.h, 7); ctx.fillStyle = '#b91c1c'; ctx.fill(); ctx.fillStyle = '#ffd700'; ctx.fillRect(ox, gy - o.h * 0.65, o.w, 5); ctx.fillRect(ox, gy - o.h * 0.3, o.w, 5); }
+      else { ctx.fillStyle = '#8a5a14'; ctx.fillRect(ox, gy - o.h, o.w, o.h); ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3; ctx.strokeRect(ox + 2, gy - o.h + 2, o.w - 4, o.h - 4); ctx.beginPath(); ctx.moveTo(ox + 2, gy - o.h + 2); ctx.lineTo(ox + o.w - 2, gy - 2); ctx.stroke(); }
+    }
+    for (i = 0; i < coins.length; i++) {
+      var cx = coins[i].x - dist, cy = gy - coins[i].y;
+      ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#b8860b'; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 6.2832); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(220,220,220,.5)';
+    for (i = 0; i < puffs.length; i++) { ctx.globalAlpha = Math.max(0, puffs[i].t * 2); ctx.beginPath(); ctx.arc(bx() + puffs[i].x, gy - puffs[i].y - 4, 5 + (0.4 - puffs[i].t) * 14, 0, 6.2832); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    drawBike(ctx, bx(), gy - bike.y);
+  }
+
+  function drawBike(ctx, x, y) {
+    var tilt = GK.clamp(-bike.vy * 0.0006, -0.4, 0.4);
+    if (falling) tilt = 0.5 + (-bike.y) / 160;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
+    var R = 15, wx = [-24, 24], i;
+    for (i = 0; i < 2; i++) {
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(wx[i], -R, R - 3, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(wx[i], -R, R - 3, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = '#999'; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (var s = 0; s < 3; s++) { var a = wheel + s * 1.0472; ctx.moveTo(wx[i] + Math.cos(a) * (R - 3), -R + Math.sin(a) * (R - 3)); ctx.lineTo(wx[i] - Math.cos(a) * (R - 3), -R - Math.sin(a) * (R - 3)); }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-24, -R); ctx.lineTo(-6, -30); ctx.lineTo(14, -32); ctx.lineTo(24, -R); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(14, -32); ctx.lineTo(20, -46); ctx.lineTo(30, -48); ctx.stroke();
+    ctx.fillStyle = '#b8860b'; GK.rr(ctx, -10, -36, 22, 14, 4); ctx.fill();
+    ctx.fillStyle = '#e11d48'; GK.rr(ctx, -20, -42, 26, 9, 4); ctx.fill();
+    ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-8, -44); ctx.lineTo(-2, -64); ctx.lineTo(18, -60); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, -42); ctx.lineTo(4, -28); ctx.stroke();
+    ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.arc(22, -74, 9, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(22, -76, 10, Math.PI, 0); ctx.fill();
+    ctx.restore();
+  }
+
+  GK.start({ id: 'moto-dash', title: 'Moto Dash', tip: 'Space / Up / tap to jump - hold longer to jump higher. Clear cones, barrels and road gaps. Down = fall faster.',
+             reset: reset, update: update, draw: draw, hud: function () { return Math.round(speed * 0.3) + ' km/h  Coins ' + coinN; } });
+})();
+</script>
+</body></html>

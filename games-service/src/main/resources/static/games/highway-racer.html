@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><title>Gold Highway Racer</title><style>html,body{margin:0;height:100%;background:#0b3a68;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Georgia,serif}canvas{display:block}#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,50,95,.82);color:#ffd700;text-align:center;padding:20px;cursor:pointer}#ovTitle{font-size:clamp(24px,5vw,40px);font-weight:bold;text-shadow:2px 2px 0 #8a6508,4px 4px 8px #0a2f55}#ovText{margin-top:12px;color:#e6f2ff;max-width:560px;line-height:1.5}.tc{position:fixed;bottom:14px;display:flex;gap:10px;z-index:5}.tc.l{left:14px}.tc.r{right:14px}.tb{width:74px;height:74px;border-radius:50%;border:3px solid #ffd700;background:rgba(12,62,112,.7);color:#ffd700;font:bold 15px Georgia,serif;display:flex;align-items:center;justify-content:center}@media (hover:hover) and (pointer:fine){.tc{display:none}}</style></head><body>
+<canvas id="c"></canvas><div id="overlay"><div id="ovTitle"></div><div id="ovText"></div></div>
+<div class="tc l"><div class="tb" data-act="left">&#9664;</div><div class="tb" data-act="right">&#9654;</div></div><div class="tc r"><div class="tb" data-act="act">NITRO</div></div>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var COLORS = ['#e11d48', '#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#eab308'];
+  var LANES = 4;
+  var P, traffic, coins, offset, speed, nitro, boosting, dist, coinCount, spawnT, coinT, shake, roadX, roadW;
+
+  function geom() { roadW = Math.min(GK.w * 0.78, 480); roadX = (GK.w - roadW) / 2; }
+  function reset() {
+    geom();
+    P = { x: GK.w / 2, y: GK.h - 110, vx: 0, w: 34, h: 62 };
+    traffic = []; coins = []; offset = 0; speed = 300; nitro = 100; boosting = false; dist = 0; coinCount = 0;
+    spawnT = 0.6; coinT = 1.5; shake = 0;
+  }
+
+  function update(dt) {
+    var k = GK.keys, i, c;
+    geom(); P.y = GK.h - 110;
+    var base = 300 + Math.min(420, dist / 60);
+    var target = base * (k.up ? 1.12 : 1) * (k.down ? 0.6 : 1);
+    boosting = !!k.act && nitro > 0;
+    if (boosting) { target *= 1.6; nitro = Math.max(0, nitro - 35 * dt); } else { nitro = Math.min(100, nitro + 6 * dt); }
+    speed += (target - speed) * Math.min(1, 3 * dt);
+
+    var want = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+    P.vx += (want * 430 - P.vx) * Math.min(1, 8 * dt);
+    P.x += P.vx * dt;
+    var minX = roadX + P.w / 2 + 6, maxX = roadX + roadW - P.w / 2 - 6;
+    if (P.x < minX || P.x > maxX) { P.x = GK.clamp(P.x, minX, maxX); speed *= 0.985; shake = 0.15; }
+
+    dist += speed * dt; offset = (offset + speed * dt) % 80;
+    GK.score = dist / 25 + coinCount * 50;
+
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      var margin = P.w / 2 + 30;
+      var x = GK.rand(roadX + margin, roadX + roadW - margin), clear = true;
+      for (i = 0; i < traffic.length; i++) if (traffic[i].y < 170 && Math.abs(traffic[i].x - x) < 104) clear = false;
+      if (clear) {
+        traffic.push({ x: x, y: -90, w: 34, h: 62, v: base * GK.rand(0.35, 0.6), drift: Math.random() < 0.3 ? GK.rand(-45, 45) : 0,
+                       color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+      }
+      spawnT = GK.clamp(260 / speed * GK.rand(0.9, 1.5), 0.25, 1.2);
+    }
+    coinT -= dt;
+    if (coinT <= 0) { coins.push({ x: GK.rand(roadX + 30, roadX + roadW - 30), y: -30 }); coinT = GK.rand(0.5, 1.4); }
+
+    for (i = traffic.length - 1; i >= 0; i--) {
+      c = traffic[i]; c.y += (speed - c.v) * dt; c.x += c.drift * dt;
+      if (c.x < roadX + 24 || c.x > roadX + roadW - 24) { c.drift = -c.drift; c.x = GK.clamp(c.x, roadX + 24, roadX + roadW - 24); }
+      if (c.y > GK.h + 120 || c.y < -400) { traffic.splice(i, 1); continue; }
+      if (Math.abs(c.x - P.x) < (c.w + P.w) / 2 - 5 && Math.abs(c.y - P.y) < (c.h + P.h) / 2 - 6) { shake = 0.4; GK.gameOver('Crashed!'); return; }
+    }
+    for (i = coins.length - 1; i >= 0; i--) {
+      c = coins[i]; c.y += speed * dt;
+      if (c.y > GK.h + 40) { coins.splice(i, 1); continue; }
+      if (Math.abs(c.x - P.x) < 26 && Math.abs(c.y - P.y) < 38) { coinCount++; nitro = Math.min(100, nitro + 12); coins.splice(i, 1); }
+    }
+    shake = Math.max(0, shake - dt);
+  }
+
+  function car(ctx, x, y, w, h, color, flame) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = '#10325c'; ctx.fillRect(-w / 2 - 3, -h / 2 + 8, 5, 16); ctx.fillRect(w / 2 - 2, -h / 2 + 8, 5, 16);
+    ctx.fillRect(-w / 2 - 3, h / 2 - 24, 5, 16); ctx.fillRect(w / 2 - 2, h / 2 - 24, 5, 16);
+    GK.rr(ctx, -w / 2, -h / 2, w, h, 9); ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(-w / 2 + 4, -h / 2 + 3, 5, h - 6);
+    ctx.fillStyle = '#0b1530'; GK.rr(ctx, -w / 2 + 5, -h / 2 + 14, w - 10, 16, 4); ctx.fill();
+    ctx.fillStyle = '#0b1530'; GK.rr(ctx, -w / 2 + 6, h / 2 - 22, w - 12, 10, 3); ctx.fill();
+    ctx.fillStyle = '#fff7b0'; ctx.fillRect(-w / 2 + 3, -h / 2 + 1, 7, 4); ctx.fillRect(w / 2 - 10, -h / 2 + 1, 7, 4);
+    ctx.fillStyle = '#ff2d2d'; ctx.fillRect(-w / 2 + 3, h / 2 - 5, 7, 3); ctx.fillRect(w / 2 - 10, h / 2 - 5, 7, 3);
+    if (flame) {
+      ctx.fillStyle = '#ffb300'; ctx.beginPath(); ctx.moveTo(-8, h / 2); ctx.lineTo(0, h / 2 + 26 + Math.random() * 14); ctx.lineTo(8, h / 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-4, h / 2); ctx.lineTo(0, h / 2 + 12 + Math.random() * 6); ctx.lineTo(4, h / 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function draw(ctx, w, h) {
+    geom(); var i;
+    ctx.save();
+    if (shake > 0) ctx.translate(GK.rand(-4, 4), GK.rand(-4, 4));
+    ctx.fillStyle = '#0a2412'; ctx.fillRect(-10, -10, w + 20, h + 20);
+    for (i = -1; i < h / 60 + 1; i++) { ctx.fillStyle = 'rgba(255,215,0,.05)'; ctx.fillRect(0, i * 60 + offset * 0.75 % 60, roadX - 8, 4); ctx.fillRect(roadX + roadW + 8, i * 60 + offset * 0.75 % 60, w, 4); }
+    ctx.fillStyle = '#ffd700'; ctx.fillRect(roadX - 8, 0, 8, h); ctx.fillRect(roadX + roadW, 0, 8, h);
+    ctx.fillStyle = '#23232b'; ctx.fillRect(roadX, 0, roadW, h);
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (var l = 1; l < LANES; l++) for (var y = -80 + offset; y < h; y += 80) ctx.fillRect(roadX + roadW / LANES * l - 2, y, 4, 40);
+    if (boosting) { ctx.strokeStyle = 'rgba(255,215,0,.35)'; ctx.lineWidth = 2; for (i = 0; i < 14; i++) { var sx = roadX + Math.random() * roadW, sy = Math.random() * h; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + 40 + Math.random() * 40); ctx.stroke(); } }
+    for (i = 0; i < coins.length; i++) {
+      var c = coins[i]; ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(c.x, c.y, 11, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#b8860b'; ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#fff3a0'; ctx.fillRect(c.x - 2, c.y - 5, 3, 8);
+    }
+    for (i = 0; i < traffic.length; i++) car(ctx, traffic[i].x, traffic[i].y, traffic[i].w, traffic[i].h, traffic[i].color, false);
+    car(ctx, P.x, P.y, P.w, P.h, '#ffd700', boosting);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(10,55,100,.75)'; ctx.fillRect(12, h - 26, 160, 12);
+    ctx.fillStyle = nitro > 25 ? '#38bdf8' : '#ef4444'; ctx.fillRect(13, h - 25, 158 * nitro / 100, 10);
+    ctx.fillStyle = '#ffd700'; ctx.font = 'bold 11px Georgia'; ctx.textAlign = 'left'; ctx.fillText('NITRO', 14, h - 40);
+  }
+
+  GK.start({ id: 'highway-racer', title: 'Gold Highway Racer', tip: 'Left/Right or A/D steer. Hold Space for nitro. Collect coins to refill it. Avoid the traffic!',
+             reset: reset, update: update, draw: draw, hud: function () { return Math.round(speed * 0.35) + ' km/h'; } });
+})();
+</script>
+</body></html>

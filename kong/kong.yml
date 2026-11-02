@@ -1,0 +1,24 @@
+# OPTIONAL Kong gateway (DB-less). Not needed to run on one PC - it is there for the day the services run on a server.
+# Start:  docker compose -f docker-compose.kong.yml up        Then open http://localhost:8000
+# Also set in application.yml:  games.service.url: http://localhost:8000/games-service
+# and for the games service:     GAMES_ALLOWED_ORIGINS / games.allowed-origins: http://localhost:8000
+_format_version: "3.0"
+services:
+  - name: games-service
+    url: http://host.docker.internal:8095
+    routes:
+      - name: games-route
+        paths: ["/games-service"]
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config: { minute: 300, policy: local }
+      - name: correlation-id
+        config: { header_name: X-Request-Id, generator: uuid, echo_downstream: true }
+  - name: pdf-voice
+    url: http://host.docker.internal:8089
+    read_timeout: 200000          # PDF analysis / translation can take minutes
+    routes:
+      - name: pdf-voice-route
+        paths: ["/"]
+        strip_path: false

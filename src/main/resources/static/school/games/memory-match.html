@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Memory Match - School games</title>
+    <link rel="stylesheet" href="../../css/gold.css"/>
+    <link rel="stylesheet" href="../../css/visual-errors.css"/>
+    <link rel="stylesheet" href="../school.css"/>
+    <link rel="stylesheet" href="games.css"/>
+</head>
+<body class="pop game">
+<div class="pop-bar"><h1 class="gold3d"><span id="gtitle">Memory Match</span> <small id="glevel"></small></h1></div>
+<main class="pop-main"><div class="gm">
+    <div id="notice" class="notice" hidden></div>
+    <div class="hud3"><div><span>Score</span><b id="score">0</b></div><div><span id="l2">Moves</span><b id="t2">0</b></div><div><span>Best</span><b id="best">-</b></div></div>
+    <div class="stage" id="stage"></div>
+    <div class="card board" id="board"></div>
+</div></main>
+<script src="../../js/visual-errors.js"></script>
+<script src="../school-common.js"></script>
+<script src="edu-games.js"></script>
+<script src="game-common.js"></script>
+<script>
+var K = GameKit, el = K.el, G = EduGames, $ = function (i) { return document.getElementById(i); }, stage = $('stage');
+function clr(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function setScore(v) { $('score').textContent = v; }
+function over(score, msg) {
+  clr(stage); stage.appendChild(el('div', { class: 'bigq', text: msg })); stage.appendChild(el('p', { text: 'You scored ' + score + ' points' }));
+  K.finish(score).then(function (best) { $('best').textContent = best; }); K.confetti(innerWidth / 2, innerHeight / 3, 90);
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '↻ Play again', onclick: function () { go(); } }));
+}
+
+var ctx, pairs, first, lock, moves, found, sec, tm;
+function go() {
+  pairs = G.memoryPairs(ctx.level); moves = 0; found = 0; first = null; lock = false; sec = 0; setScore(0); $('t2').textContent = 'Moves 0';
+  var deck = G.shuffle(Math.random, pairs.reduce(function (a, p) { return a.concat([{ id: p.id, t: p.a }, { id: p.id, t: p.b }]); }, []));
+  clr(stage); var cols = deck.length <= 12 ? 4 : 5, grid = el('div', { class: 'grid', style: 'grid-template-columns:repeat(' + cols + ',1fr)' });
+  deck.forEach(function (d) {
+    var card = el('div', { class: 'mcard' }, [el('i', null, [el('b', { text: '?' }), el('u', { text: d.t })])]);
+    card.addEventListener('click', function () { flip(card, d); }); grid.appendChild(card);
+  });
+  stage.appendChild(grid); clearInterval(tm); tm = setInterval(function () { sec++; }, 1000);
+}
+function flip(card, d) {
+  if (lock || card.classList.contains('up') || card.classList.contains('done')) return;
+  card.classList.add('up');
+  if (!first) { first = { card: card, d: d }; return; }
+  moves++; $('t2').textContent = 'Moves ' + moves; lock = true;
+  if (first.d.id === d.id) {
+    first.card.classList.replace('up', 'done'); card.classList.replace('up', 'done'); found++; K.burstAt(card); first = null; lock = false;
+    if (found === pairs.length) { clearInterval(tm); var s = Math.max(50, 1000 - moves * 20 - sec * 3) + pairs.length * 50; setScore(s); setTimeout(function () { over(s, 'All pairs found! 🎉'); }, 600); }
+  } else { var f = first; first = null; setTimeout(function () { f.card.classList.remove('up'); card.classList.remove('up'); lock = false; }, 800); }
+}
+K.boot('memory-match', 'Memory Match').then(function (c) {
+  ctx = c; clr(stage); stage.appendChild(el('div', { class: 'bigq', text: 'Find the matching pairs' }));
+  stage.appendChild(el('p', { text: 'Fewer moves and less time give more points. Pairs get harder with your class.' }));
+  stage.appendChild(el('button', { type: 'button', class: 'startbtn', text: '▶ Start', onclick: go }));
+});
+</script>
+</body>
+</html>
